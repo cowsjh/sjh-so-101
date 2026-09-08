@@ -14,7 +14,6 @@ def raw2shift(id, raw, max_raw=4096):
     shift = (raw + offset) % max_raw
     return shift
 
-
 def shift2raw(id, shift, max_raw=4096):
     with open("calibration_offset.json", "r", encoding='utf-8') as f:
         data = json.load(f)
