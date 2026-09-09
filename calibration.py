@@ -2,7 +2,7 @@ from scservo_sdk import sms_sts, PortHandler, COMM_SUCCESS
 import numpy as np
 import time
 import json
-from convert import raw2shift, shift2raw, shift2rad, deg2shift, raw2deg
+from src.convert import  raw2deg, raw2deg
 ## ID 6 아래2655~위4079
 ## ID 5 
 
@@ -52,7 +52,7 @@ def servo_check(servo_counts):
 
 # 변환 함수(raw/shift/deg)는 convert.py로 분리됨 → 상단에서 import
 
-def write_current_raw(id, key, value=None, json_file="calibration.json"):
+def write_current_raw(id, key, value=None, json_file="calibration_offset.json"):
     with open(json_file, "r", encoding='utf-8') as f:
         data = json.load(f)
     
@@ -65,40 +65,95 @@ def write_current_raw(id, key, value=None, json_file="calibration.json"):
         json.dump(data, f, indent=4)
 
 
-def set_shifted_limits(ids):
-    with open("calibration_offset.json", "r", encoding='utf-8') as f:
+def set_raw_limits(ids,json_file= "calibration_offset.json"):
+
+    with open(json_file, "r", encoding='utf-8') as f:
         data = json.load(f)
 
-    shifted = {}
-    for id in IDS:
-        shifted[id] = 9999, -9999
+    
+    #reset
+    for id in ids:
+        
+        if servo.read1ByteTxRx(id,ADDR_TORQUE_ENABLE)[0]:
+            servo.write1ByteTxRx(id,ADDR_TORQUE_ENABLE,0)
+
+        data[str(id)]["raw_min"] = 9999
+        data[str(id)]["raw_max"] = -9999
+
     try:
         while True:
             for id in ids:
                 # id = 1
-                pos, _, _ = servo.ReadPos(id)
-                shift = raw2shift(id, pos)
-                print(f"id: {id}, raw: {pos}, shift: {shift}, deg: {np.rad2deg(shift2rad(id, shift))}")
-                min_shift = min(shifted[id][0],shift)
-                max_shift = max(shifted[id][1],shift)
-                shifted[id] = min_shift,max_shift
+                raw, _, _ = servo.ReadPos(id)
+                print(f"id: {id}, raw: {raw}")
+                data[str(id)]["raw_min"] = min(data[str(id)]["raw_min"],raw)
+                data[str(id)]["raw_max"] = max(data[str(id)]["raw_max"],raw)
+                # pose[id] = min_shift,max_shift
                 time.sleep(0.05)
     except KeyboardInterrupt:
-        # print(shifted)
-        for id in ids:
-            # id = 1
-            write_current_raw(id, "shifted_min", shifted[id][0], "calibration_offset.json")
-            write_current_raw(id, "shifted_max", shifted[id][1], "calibration_offset.json")
-            
-            print(f"\n{id} : shift: {shifted[id][0]}, {shifted[id][1]}, deg: {np.rad2deg(shift2rad(id, shifted[id][0]))}, {np.rad2deg(shift2rad(id, shifted[id][1]))}")
+        with open(json_file, "w", encoding='utf-8') as f:
+            json.dump(data, f, indent=4)
         
-def set_EEPROM (id, ADDR, data, result=False):
-    servo.write1byte(id,ADDR,data)
+        for id in ids:
+            print(f"\n{id} : raw: {data[str(id)]['raw_min']}, {data[str(id)]['raw_max']}")
+
+        
+def set_center (id,json_file= "calibration_offset.json"):
+
+    if servo.read1ByteTxRx(id,ADDR_TORQUE_ENABLE)[0] == 1:
+        servo.write1ByteTxRx(id,ADDR_TORQUE_ENABLE,0)
+
+    with open(json_file, "r", encoding='utf-8') as f:
+        data = json.load(f)
     
+    min = data[str(id)]["raw_min"]
+    max = data[str(id)]["raw_max"]
+
+    mid = int(min+(((min-max)**2)**0.5 * 0.5))
+
+    print(f"{min} - {max} = {mid}")
+    # raw, _, _ = servo.ReadPos(id)
     
+    if servo.ReadPos(id) == mid:
+        pass
+    else:
+        if servo.read1ByteTxRx(id,ADDR_TORQUE_ENABLE)[0]==0:
+            servo.write1ByteTxRx(id,ADDR_TORQUE_ENABLE,1)
+        servo.WritePosEx(id,mid,100,15)
+        done = 0
+        while done == 0:
+            current_raw = servo.ReadPos(id)[0]
+            print(current_raw)
+            time.sleep(0.05)
+            if abs(current_raw-mid) < 5:
+
+                diff = current_raw - int((RATIO_MAX+1)/2)
+
+                data[str(id)]["raw_max"] += diff
+                data[str(id)]["raw_min"] -= diff
+
+                with open(json_file, "w", encoding='utf-8') as f:
+                    json.dump(data, f, indent=4)
+
+                servo.write1ByteTxRx(id,ADDR_TORQUE_ENABLE,128)
+                print(f"now {id}'s middle is {servo.ReadPos(id)[0]}")
+                servo.write1ByteTxRx(id,ADDR_TORQUE_ENABLE,0)
+
+                return
+        # if servo.ReadPos(id) == mid:
+
+    # raw, _, _ = servo.ReadPos(id)
+    # print (f"changed: {raw}")
+    
+
+
 def main():
     servo_counts = 6
     servo_check(servo_counts)
+    # set_center(6)
+    # servo.write1ByteTxRx(6,ADDR_TORQUE_ENABLE,128)
+    # set_raw_limits([6])
+    # set_raw_limits(IDS)
 
     # torque disable
     # for i in range(6):
@@ -118,20 +173,50 @@ def main():
     #     time.sleep(0.05)
 
 
-    id = 2
-    try:
-        while True:
-            raw, _, _ = servo.ReadPos(id)
-            shift = raw2shift(id,raw)
-            print(f"raw: {raw}, shift: {shift}, rad: {shift2rad(1,shift):.2f}, degrees: {raw2deg(id,raw):.2f}")
-            time.sleep(0.05)
-    except KeyboardInterrupt:
-        return
+    # id = 6
+    # try:
+    #     while True:
+    #         raw, _, _ = servo.ReadPos(id)
+        
+    #         print(f"raw: {raw}, degrees: {raw2deg(raw):.2f}")
+    #         time.sleep(0.05)
+    # except KeyboardInterrupt:
+    #     return
+
+
+    # raw, _, _ = servo.ReadPos(id)
+    # print (f"current: {raw}")
+
+    # set_raw_limits(IDS)
+
+    # raw, _, _ = servo.ReadPos(id)
+    # print (f"changed: {raw}")
+
+    # write_current_raw(id,"offset",2048-raw)
+    # set_shifted_limits([6])
+
+    # while True:
+    #     raw, _, _ = servo.ReadPos(id)
+    #     print (f"current: {raw2deg(id,raw)}")
+    #     time.sleep(0.05)
+
+    
+
+    
+
 
 
 if __name__ == "__main__":
     try:
         main()
     finally:
+        ok = True
+        for id in IDS:
+            if servo.read1ByteTxRx(id,ADDR_TORQUE_ENABLE)[0] == 1:
+                servo.write1ByteTxRx(id,ADDR_TORQUE_ENABLE,0)   
+            ok &= servo.read1ByteTxRx(id,ADDR_TORQUE_ENABLE)[0] == 0
+
+        if ok:
+            print("\nevery torque is disabled")
         port_handler.closePort()
         print("\nPort closed\n")
