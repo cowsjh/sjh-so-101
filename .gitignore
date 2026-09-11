@@ -1,2 +1,6 @@
 opensrc/
 __pycache__/
+archive/
+build/
+install/
+log/

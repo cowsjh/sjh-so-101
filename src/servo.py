@@ -7,10 +7,13 @@ class Arm :
     def __init__(self, port = SERIAL_PORT):
         self.port_handler = PortHandler(port)
         self.servo = sms_sts(self.port_handler)
-        self.calib = self.load_calib()
+        self.calib = self.load_json(CALIB_FILE)
+        self.poses = self.load_json(POSES_FILE)
 
     def __enter__(self):
         self.port_handler.openPort()
+        print("\nPort opened\n")
+
         self.ping_check()
         self.torque_check()
         return self
@@ -18,6 +21,7 @@ class Arm :
     def __exit__(self, *exc):
         for id in IDS:
             self.set_torque(id,0)
+        self.torque_check()
         self.port_handler.closePort()
         print("\nPort closed\n")
 
@@ -35,13 +39,12 @@ class Arm :
             print ("ping - ok")
 
     def torque_check(self):
-        ok = True
+
+        print("torque state")
         for id in IDS:
             data, _, _ = self.servo.read1ByteTxRx(id, ADDR_TORQUE_ENABLE)
-            ok &= data == 1
+            print(f"{id}: {'on' if data else 'off'}")
 
-        if ok:
-            print("torque - on")
 
     # init setting
 
@@ -86,13 +89,17 @@ class Arm :
     def read_pos(self,id):
         return self.servo.ReadPos(id)[0]
 
-    def load_calib(self):
-        with open(CALIB_FILE, encoding="utf-8") as f:
+    def load_json(self, JSON):
+        with open(JSON, encoding="utf-8") as f:
             return json.load(f)
 
-    def save_calib(self):
-        with open(CALIB_FILE, "w", encoding="utf-8") as f:
-            json.dump(self.calib, f, indent=4)
+    def save_json(self, JSON):
+        if JSON == CALIB_FILE :
+            with open(JSON, "w", encoding="utf-8") as f:
+                json.dump(self.calib, f, indent=4)
+        if JSON == POSES_FILE :
+            with open(JSON, "w", encoding="utf-8") as f:
+                json.dump(self.poses, f, indent=4)
 
     # calibration
 
@@ -113,7 +120,7 @@ class Arm :
                     print(f"id {id}: raw {raw}  ({lo}~{hi})")
                     time.sleep(0.05)
         except KeyboardInterrupt:                 # Ctrl+C 로 수집 종료
-            self.save_calib()                     # ← 여기서 한 번만 저장
+            self.save_json(CALIB_FILE)                     # ← 여기서 한 번만 저장
             for id in ids:
                 c = self.calib[str(id)]
                 print(f"{id}: {c['raw_min']} ~ {c['raw_max']}")
@@ -125,12 +132,11 @@ class Arm :
             else:
                 self.calib[str(id)][key] = self.servo.ReadPos(id)[0]
 
-            self.save_calib()
+            self.save_json(CALIB_FILE)
 
     def set_center(self, id):
 
-        if self.servo.read1ByteTxRx(id,ADDR_TORQUE_ENABLE)[0] == 1:
-            self.servo.write1ByteTxRx(id,ADDR_TORQUE_ENABLE,0)
+        self.set_torque(id,1)
 
         _min = self.calib[str(id)]["raw_min"]
         _max = self.calib[str(id)]["raw_max"]
@@ -143,8 +149,7 @@ class Arm :
         if self.read_pos(id) == mid:
             pass
         else:
-            if self.servo.read1ByteTxRx(id,ADDR_TORQUE_ENABLE)[0]==0:
-                self.servo.write1ByteTxRx(id,ADDR_TORQUE_ENABLE,1)
+            self.set_torque(id,1)
 
             self.servo.WritePosEx(id,mid,100,15)
             done = 0
@@ -156,13 +161,126 @@ class Arm :
 
                     diff = current_raw - int((POSITION_MAX+1)/2)
 
-                    self.calib[str(id)]["raw_max"] += diff
+                    self.calib[str(id)]["raw_max"] -= diff
                     self.calib[str(id)]["raw_min"] -= diff
 
-                    self.save_calib()
+                    self.save_json(CALIB_FILE)
 
                     self.servo.write1ByteTxRx(id,ADDR_TORQUE_ENABLE,128)
                     print(f"now {id}'s middle is {self.read_pos(id)}")
-                    self.servo.write1ByteTxRx(id,ADDR_TORQUE_ENABLE,0)
+                    self.set_torque(id,0)
 
                     return
+                
+    # move
+
+    def move_to_degree(self, id, degree, speed = 500, acc = 15):
+
+        clamped = {}
+
+        c_raw, _, _ = self.servo.ReadPos(id)
+        c_deg = raw2deg(c_raw)
+
+        t_raw = deg2raw(degree)
+        t_deg = degree
+
+        if abs(t_deg - c_deg) < 1  :
+            print("already here")
+            return
+        
+        print(f"raw: {c_raw}, deg: {c_deg:.2f}")
+
+        self.set_torque(id,1)
+        
+        mode, _, _ = self.servo.read1ByteTxRx(id,ADDR_MODE)
+        if mode != 0:
+            self.servo.write1ByteTxRx(id,ADDR_MODE,0)
+
+
+        r_max,t_min = self.calib[str(id)]["raw_max"], self.calib[str(id)]["raw_min"]
+        t_raw = max(t_min,min(r_max,t_raw))
+        
+        self.servo.WritePosEx(id, t_raw, speed, acc)
+
+        clamped[str(id)] = raw2deg(t_raw)
+
+        return clamped
+
+
+    def move_to_sync(self,deg_dict, speed= 500, acc = 15):
+
+        clamped = {}
+        for id, degree in deg_dict.items():
+
+            id = int(id)
+            degree = float(degree)
+
+            self.set_torque(id,1)
+            raw = deg2raw(degree)
+
+            #clamp min,max
+            
+            r_max,r_min = self.calib[str(id)]["raw_max"], self.calib[str(id)]["raw_min"]
+            raw = max(r_min,min(r_max,raw))
+
+            self.servo.SyncWritePosEx(id, raw, speed, acc)
+
+            clamped[str(id)] = raw2deg(raw)
+            
+        self.servo.groupSyncWrite.txPacket()
+        self.servo.groupSyncWrite.clearParam()
+
+        return clamped
+
+    def _wait_arrival(self, deg_dict, timeout=5):
+        arrived_id = set()
+        start = time.time()
+        while True:
+            goal = True
+    
+            for id, degree in deg_dict.items():
+                
+                id = int(id)
+                degree = float(degree)
+                
+                t_deg = float(degree)
+                c_deg = raw2deg(self.servo.ReadPos(id)[0])
+                is_arrived = abs(t_deg-c_deg) < 2
+                    
+                load, _, _ = self.servo.read2ByteTxRx(id, ADDR_PRESENT_LOAD)
+                curr, _, _ = self.servo.read2ByteTxRx(id, ADDR_PRESENT_CURRENT)
+                temp, _, _ = self.servo.read2ByteTxRx(id, ADDR_PRESENT_TEMPERATURE)
+    
+                print(f"{id:<3} load: {load:<5} curr: {curr:<5} temp: {temp}")
+    
+                if is_arrived and id not in arrived_id:
+    
+                    arrived_id.add(id)
+    
+                goal &= is_arrived
+            print('\n')
+    
+            if goal:
+                break
+    
+            if time.time() - start > timeout:          # 함정4: stall이면 goal이 영영 안 돼 무한대기+과열
+                stuck = [int(i) for i in deg_dict if int(i) not in arrived_id]
+                print(f"!!timeout!! {timeout}s over — {stuck}, torque off")
+                for id in deg_dict:                     # 진짜 stall일 수 있으니 토크 정리
+                    self.set_torque(int(id), 0)
+                break
+
+            time.sleep(0.1)
+
+    def get_current_pos(self):
+
+        degree_dict = {}
+        for id in IDS:
+            raw, _, _ = self.servo.ReadPos(id)
+            degree_dict[str(id)] = raw2deg(raw)
+        return degree_dict
+
+    def save_current_pose(self,pose_name):
+
+        self.poses[pose_name] = self.get_current_pos() 
+        self.save_json(POSES_FILE)
