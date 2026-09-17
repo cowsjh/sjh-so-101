@@ -1,6 +1,6 @@
 import sys, time
-from src.servo import Arm
-from src.config import IDS
+from SETUP.src.servo import Arm
+from SETUP.src.config import IDS
 
 
 def set_min_max(arm: Arm):

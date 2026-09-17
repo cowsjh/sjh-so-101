@@ -1,0 +1,25 @@
+# MoveIt → 실물 컨트롤러 연결. 이름/joints는 so101_description/config/controllers.yaml과 일치해야 함.
+moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
+
+moveit_simple_controller_manager:
+  controller_names:
+    - arm_controller
+    - gripper_controller
+
+  arm_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory   # → /arm_controller/follow_joint_trajectory
+    default: true
+    joints:
+      - shoulder_pan
+      - shoulder_lift
+      - elbow_flex
+      - wrist_flex
+      - wrist_roll
+
+  gripper_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory   # → /gripper_controller/follow_joint_trajectory
+    default: true
+    joints:
+      - gripper

@@ -4,3 +4,5 @@ archive/
 build/
 install/
 log/
+.vscode/
+.serena/

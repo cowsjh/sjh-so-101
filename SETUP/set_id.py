@@ -1,5 +1,5 @@
 import sys
-from src.servo import Arm
+from SETUP.src.servo import Arm
 
 # 서보 하나만 연결한 상태에서 그 서보의 id를 부여
 

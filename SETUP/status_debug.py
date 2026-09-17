@@ -1,7 +1,7 @@
 from scservo_sdk import sms_sts, PortHandler, COMM_SUCCESS
 
-from src.servo import Arm
-from src.config import *
+from SETUP.src.servo import Arm
+from SETUP.src.config import *
 
 import time
 

@@ -262,13 +262,15 @@ class Arm :
     
             if goal:
                 break
-    
-            if time.time() - start > timeout:          # 함정4: stall이면 goal이 영영 안 돼 무한대기+과열
-                stuck = [int(i) for i in deg_dict if int(i) not in arrived_id]
-                print(f"!!timeout!! {timeout}s over — {stuck}, torque off")
-                for id in deg_dict:                     # 진짜 stall일 수 있으니 토크 정리
-                    self.set_torque(int(id), 0)
-                break
+            if timeout == 0 :
+                pass
+            else :
+                if time.time() - start > timeout:          # 함정4: stall이면 goal이 영영 안 돼 무한대기+과열
+                    stuck = [int(i) for i in deg_dict if int(i) not in arrived_id]
+                    print(f"!!timeout!! {timeout}s over — {stuck}, torque off")
+                    for id in deg_dict:                     # 진짜 stall일 수 있으니 토크 정리
+                        self.set_torque(int(id), 0)
+                    break
 
             time.sleep(0.1)
 

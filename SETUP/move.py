@@ -9,11 +9,11 @@ def sync_write(arm : Arm, pose_name, speed=500, acc=15):
         return
     print(f"\n▶ {pose_name}")
     target = arm.move_to_sync(arm.poses[pose_name], speed, acc)  # 쏘고 clamp된 목표를 돌려받음
-    arm._wait_arrival(target, timeout = 100)                                    # 잘린 목표로 판정해야 무한대기 안 걸림
+    arm._wait_arrival(target, timeout = 0)                                    # 잘린 목표로 판정해야 무한대기 안 걸림
 
 def move(arn:Arm, id, deg):
     target = arm.move_to_degree(id,deg)
-    arm._wait_arrival(target, timeout = 10)
+    arm._wait_arrival(target, timeout = 0)
 
 
 if __name__ == "__main__":

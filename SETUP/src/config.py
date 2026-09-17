@@ -1,8 +1,11 @@
+import os
 
 BAUD_RATE = 1000000
 
-CALIB_FILE = "calibration_offset.json"
-POSES_FILE = "poses.json"
+# SETUP/ 기준 절대경로 — 실행 위치(cwd)와 무관하게 json을 찾음
+_SETUP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CALIB_FILE = os.path.join(_SETUP_DIR, "calibration_offset.json")
+POSES_FILE = os.path.join(_SETUP_DIR, "poses.json")
 
 SERIAL_PORT = "/dev/ws-servo-board"
 ADDR_MIN_ANGLE_LIMIT = 9
