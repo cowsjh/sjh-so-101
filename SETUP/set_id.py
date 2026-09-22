@@ -1,5 +1,5 @@
 import sys
-from SETUP.src.servo import Arm
+from src.servo import Arm
 
 # 서보 하나만 연결한 상태에서 그 서보의 id를 부여
 
@@ -12,6 +12,9 @@ if __name__ == "__main__":
     arm = Arm()
     arm.port_handler.openPort()
     print("\nPort opened\n")
+
+    print (f"current raw :{arm.read_pos(arm.get_id())}")
+
     try:
         arm.set_id(new_id)
     finally:

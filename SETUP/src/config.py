@@ -5,9 +5,11 @@ BAUD_RATE = 1000000
 # SETUP/ 기준 절대경로 — 실행 위치(cwd)와 무관하게 json을 찾음
 _SETUP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CALIB_FILE = os.path.join(_SETUP_DIR, "calibration_offset.json")
+CALIB_FILE_LEADER = os.path.join(_SETUP_DIR, "calibration_offset_leader.json")
 POSES_FILE = os.path.join(_SETUP_DIR, "poses.json")
 
 SERIAL_PORT = "/dev/ws-servo-board"
+SERIAL_PORT_LEADER = "/dev/ws-servo-board-leader"
 ADDR_MIN_ANGLE_LIMIT = 9
 ADDR_MAX_ANGLE_LIMIT = 11
 ADDR_MAX_TEMP_LIMIT = 13

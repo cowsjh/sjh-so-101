@@ -1,0 +1,32 @@
+{
+    "1": {
+        "name": "shoulder_pan",
+        "raw_min": 897,
+        "raw_max": 3324
+    },
+    "2": {
+        "name": "shoulder_lift",
+        "raw_min": 766,
+        "raw_max": 3364
+    },
+    "3": {
+        "name": "elbow_flex",
+        "raw_min": 898,
+        "raw_max": 3096
+    },
+    "4": {
+        "name": "wrist_flex",
+        "raw_min": 822,
+        "raw_max": 3144
+    },
+    "5": {
+        "name": "wrist_roll",
+        "raw_min": 215,
+        "raw_max": 4001
+    },
+    "6": {
+        "name": "gripper",
+        "raw_min": 1872,
+        "raw_max": 3303
+    }
+}

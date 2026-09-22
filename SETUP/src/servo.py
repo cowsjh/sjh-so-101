@@ -4,10 +4,11 @@ from src.config import *
 from src.convert import *
 
 class Arm :
-    def __init__(self, port = SERIAL_PORT):
+    def __init__(self, port = SERIAL_PORT, calib_file = CALIB_FILE):
         self.port_handler = PortHandler(port)
         self.servo = sms_sts(self.port_handler)
-        self.calib = self.load_json(CALIB_FILE)
+        self.calib_file = calib_file
+        self.calib = self.load_json(calib_file)
         self.poses = self.load_json(POSES_FILE)
 
     def __enter__(self):
@@ -94,7 +95,7 @@ class Arm :
             return json.load(f)
 
     def save_json(self, JSON):
-        if JSON == CALIB_FILE :
+        if JSON == self.calib_file :
             with open(JSON, "w", encoding="utf-8") as f:
                 json.dump(self.calib, f, indent=4)
         if JSON == POSES_FILE :
