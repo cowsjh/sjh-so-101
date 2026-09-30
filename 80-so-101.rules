@@ -1,0 +1,2 @@
+SUBSYSTEM=="tty",ATTRS{serial}=="5B8E114947", SYMLINK+="ws-servo-board"
+SUBSYSTEM=="tty",ATTRS{serial}=="5B91031313", SYMLINK+="ws-servo-board-leader"
